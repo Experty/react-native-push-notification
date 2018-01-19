@@ -10,6 +10,7 @@ import android.os.Looper;
 import android.util.Log;
 
 import com.dieam.reactnativepushnotification.helpers.ApplicationBadgeHelper;
+import com.facebook.react.HeadlessJsTaskService;
 import com.facebook.react.ReactApplication;
 import com.facebook.react.ReactInstanceManager;
 import com.facebook.react.bridge.Arguments;
@@ -131,7 +132,8 @@ public class RNPushNotificationListenerService extends GcmListenerService {
 
         if (shouldWakeUp(bundle)) {
             // TODO: 1. open app to foreground
-            Intent intent = new Intent(context, intentClass);
+            Intent intent = new Intent();
+            intent.setClassName(context, "com.experty.MyTaskService");
             intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_MULTIPLE_TASK);
             intent.putExtra("call", bundle);
             try {
@@ -139,7 +141,9 @@ public class RNPushNotificationListenerService extends GcmListenerService {
                 if (isForeground) {
                     jsDelivery.notifyNotification(bundle);
                 } else {
-                    context.startActivity(intent);
+//                    context.startActivity(intent);
+                    context.startService(intent);
+                    HeadlessJsTaskService.acquireWakeLockNow(context);
                 }
             } catch (Exception e) {
                 Log.e(LOG_TAG, e.getMessage());
