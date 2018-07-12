@@ -98,7 +98,7 @@ public class RNPushNotificationListenerService extends GcmListenerService {
            try {
                json.put("default", b.get("default"));
                JSONObject body = new JSONObject(json.getString("default"));
-               Log.d(LOG_TAG, "body  " body);
+               Log.d(LOG_TAG, "body  " + body);
                shouldWakeUp = body.has("wakeUp");
            } catch (JSONException e) {
                Log.e(LOG_TAG, e.getMessage());
