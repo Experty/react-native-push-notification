@@ -114,20 +114,20 @@ public class RNPushNotificationListenerService extends FirebaseMessagingService 
     }
 
     private Boolean shouldWakeUp(Bundle b) {
-        Boolean shouldWakeUp = false;
-        if (b.containsKey("default")) {
-            JSONObject json = new JSONObject();
-            try {
-                json.put("default", b.get("default"));
-                JSONObject body = new JSONObject(json.getString("default"));
-                Log.d(LOG_TAG, "body  " + body);
-                shouldWakeUp = body.has("wakeUp");
-            } catch (JSONException e) {
-                Log.e(LOG_TAG, e.getMessage());
-            }
-        }
-        return shouldWakeUp;
-    }
+       Boolean shouldWakeUp = false;
+       if (b.containsKey("default")) {
+           JSONObject json = new JSONObject();
+           try {
+               json.put("default", b.get("default"));
+               JSONObject body = new JSONObject(json.getString("default"));
+               Log.d(LOG_TAG, "body  " + body);
+               shouldWakeUp = body.has("wakeUp");
+           } catch (JSONException e) {
+               Log.e(LOG_TAG, e.getMessage());
+           }
+       }
+       return shouldWakeUp;
+   }
 
     private void handleRemotePushNotification(ReactApplicationContext context, Bundle bundle) {
 
@@ -141,37 +141,37 @@ public class RNPushNotificationListenerService extends FirebaseMessagingService 
 
         RNPushNotificationJsDelivery jsDelivery = new RNPushNotificationJsDelivery(context);
 
-        // NOTE: Customization issue for
-        String packageName = context.getPackageName();
-        Intent launchIntent = context.getPackageManager().getLaunchIntentForPackage(packageName);
-        String className = launchIntent.getComponent().getClassName();
-        Class intentClass = null;
-        try {
-            intentClass = Class.forName(className);
-        } catch (ClassNotFoundException e) {
-            Log.e(LOG_TAG, e.getMessage());
-        }
-
-        if (shouldWakeUp(bundle)) {
-            // TODO: 1. open app to foreground
-            Intent intent = new Intent();
-            intent.setClassName(context, "com.experty.MyTaskService");
-            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_MULTIPLE_TASK);
-            intent.putExtra("call", bundle);
-            try {
-                // TODO: 2. send notification to js handlers (see example below)
-                if (isForeground) {
-                    jsDelivery.notifyNotification(bundle);
-                } else {
-//                    context.startActivity(intent);
-                    context.startService(intent);
-                    HeadlessJsTaskService.acquireWakeLockNow(context);
+                // NOTE: Customization issue for
+                String packageName = context.getPackageName();
+                Intent launchIntent = context.getPackageManager().getLaunchIntentForPackage(packageName);
+                String className = launchIntent.getComponent().getClassName();
+                Class intentClass = null;
+                try {
+                    intentClass = Class.forName(className);
+                } catch (ClassNotFoundException e) {
+                    Log.e(LOG_TAG, e.getMessage());
                 }
-            } catch (Exception e) {
-                Log.e(LOG_TAG, e.getMessage());
-            }
-            return;
-        }
+
+                if (shouldWakeUp(bundle)) {
+                    // TODO: 1. open app to foreground
+                    Intent intent = new Intent();
+                    intent.setClassName(context, "com.experty.MyTaskService");
+                    intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_MULTIPLE_TASK);
+                    intent.putExtra("call", bundle);
+                    try {
+                        // TODO: 2. send notification to js handlers (see example below)
+                        if (isForeground) {
+                            jsDelivery.notifyNotification(bundle);
+                        } else {
+                        //  context.startActivity(intent);
+                            context.startService(intent);
+                            HeadlessJsTaskService.acquireWakeLockNow(context);
+                        }
+                    } catch (Exception e) {
+                        Log.e(LOG_TAG, e.getMessage());
+                    }
+                    return;
+                }
 
         bundle.putBoolean("foreground", isForeground);
         bundle.putBoolean("userInteraction", false);

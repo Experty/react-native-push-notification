@@ -528,7 +528,7 @@ public class RNPushNotificationHelper {
     }
 
     private static boolean channelCreated = false;
-    private void checkOrCreateChannel(NotificationManager manager) {
+    private static void checkOrCreateChannel(NotificationManager manager) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O)
             return;
         if (channelCreated)
