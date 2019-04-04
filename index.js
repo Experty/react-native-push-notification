@@ -165,6 +165,7 @@ Notifications.localNotificationSchedule = function(details: Object) {
 			fireDate: details.date.toISOString(),
 			alertTitle: details.title,
 			alertBody: details.message,
+			category: details.category,
 			soundName: soundName,
 			userInfo: details.userInfo,
 			repeatInterval: details.repeatType
@@ -275,6 +276,10 @@ Notifications.requestPermissions = function() {
 };
 
 /* Fallback functions */
+Notifications.subscribeToTopic = function() {
+	return this.callNative('subscribeToTopic', arguments);
+};
+
 Notifications.presentLocalNotification = function() {
 	return this.callNative('presentLocalNotification', arguments);
 };
