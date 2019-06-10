@@ -155,15 +155,19 @@ public class RNPushNotificationListenerService extends FirebaseMessagingService 
                 if (shouldWakeUp(bundle)) {
                     // TODO: 1. open app to foreground
                     Intent intent = new Intent();
+                    Intent IncomingCallService = new Intent();
                     intent.setClassName(context, "com.experty.MyTaskService");
+                    IncomingCallService.setClassName(context, "com.experty.IncomingCallService");
                     intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_MULTIPLE_TASK);
                     intent.putExtra("call", bundle);
+                    IncomingCallService.putExtra("call", bundle);
                     try {
                         // TODO: 2. send notification to js handlers (see example below)
                         if (isForeground) {
                             jsDelivery.notifyNotification(bundle);
                         } else {
                         //  context.startActivity(intent);
+                            context.startService(IncomingCallService);
                             context.startService(intent);
                             HeadlessJsTaskService.acquireWakeLockNow(context);
                         }
@@ -171,7 +175,7 @@ public class RNPushNotificationListenerService extends FirebaseMessagingService 
                         Log.e(LOG_TAG, e.getMessage());
                     }
                     return;
-                }
+                }        
 
         bundle.putBoolean("foreground", isForeground);
         bundle.putBoolean("userInteraction", false);
