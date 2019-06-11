@@ -129,6 +129,41 @@ public class RNPushNotificationListenerService extends FirebaseMessagingService 
        return shouldWakeUp;
    }
 
+   private Boolean isCallNotification(Bundle b) {
+        Boolean isCallNotification = false;
+        if (b.containsKey("default")) {
+            JSONObject json = new JSONObject();
+            try {
+                json.put("default", b.get("default"));
+                JSONObject body = new JSONObject(json.getString("default"));
+                shouldWakeUp = body.has("N_NEW_CALL");
+            } catch (JSONException e) {
+                Log.e(LOG_TAG, e.getMessage());
+            }
+        }
+        return isCallNotification;
+    }
+
+    private Boolean isCallNotification(Bundle b) {
+        Boolean isCallNotification = false;
+        if (b.containsKey("default")) {
+            JSONObject json = new JSONObject();
+            try {
+                json.put("default", b.get("default"));
+                JSONObject body = new JSONObject(json.getString("default"));
+
+                if (body.has("event")) {
+                    String event = body.getString("event");
+                    if (event.equals("N_NEW_CALL"))
+                        isCallNotification = true;
+                }
+            } catch (JSONException e) {
+                Log.e(LOG_TAG, e.getMessage());
+            }
+        }
+        return isCallNotification;
+    }
+
     private void handleRemotePushNotification(ReactApplicationContext context, Bundle bundle) {
 
         // If notification ID is not provided by the user for push notification, generate one at random
@@ -167,7 +202,8 @@ public class RNPushNotificationListenerService extends FirebaseMessagingService 
                             jsDelivery.notifyNotification(bundle);
                         } else {
                         //  context.startActivity(intent);
-                            context.startService(IncomingCallService);
+                            if (isCallNotification(bundle))
+                                context.startService(IncomingCallService);
                             context.startService(intent);
                             HeadlessJsTaskService.acquireWakeLockNow(context);
                         }
