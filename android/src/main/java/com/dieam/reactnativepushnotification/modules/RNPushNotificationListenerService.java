@@ -129,21 +129,6 @@ public class RNPushNotificationListenerService extends FirebaseMessagingService 
        return shouldWakeUp;
    }
 
-   private Boolean isCallNotification(Bundle b) {
-        Boolean isCallNotification = false;
-        if (b.containsKey("default")) {
-            JSONObject json = new JSONObject();
-            try {
-                json.put("default", b.get("default"));
-                JSONObject body = new JSONObject(json.getString("default"));
-                shouldWakeUp = body.has("N_NEW_CALL");
-            } catch (JSONException e) {
-                Log.e(LOG_TAG, e.getMessage());
-            }
-        }
-        return isCallNotification;
-    }
-
     private Boolean isCallNotification(Bundle b) {
         Boolean isCallNotification = false;
         if (b.containsKey("default")) {
