@@ -129,6 +129,26 @@ public class RNPushNotificationListenerService extends FirebaseMessagingService 
        return shouldWakeUp;
    }
 
+    private Boolean isCallNotification(Bundle b) {
+        Boolean isCallNotification = false;
+        if (b.containsKey("default")) {
+            JSONObject json = new JSONObject();
+            try {
+                json.put("default", b.get("default"));
+                JSONObject body = new JSONObject(json.getString("default"));
+
+                if (body.has("event")) {
+                    String event = body.getString("event");
+                    if (event.equals("N_NEW_CALL"))
+                        isCallNotification = true;
+                }
+            } catch (JSONException e) {
+                Log.e(LOG_TAG, e.getMessage());
+            }
+        }
+        return isCallNotification;
+    }
+
     private void handleRemotePushNotification(ReactApplicationContext context, Bundle bundle) {
 
         // If notification ID is not provided by the user for push notification, generate one at random
@@ -155,15 +175,20 @@ public class RNPushNotificationListenerService extends FirebaseMessagingService 
                 if (shouldWakeUp(bundle)) {
                     // TODO: 1. open app to foreground
                     Intent intent = new Intent();
+                    Intent IncomingCallService = new Intent();
                     intent.setClassName(context, "com.experty.MyTaskService");
+                    IncomingCallService.setClassName(context, "com.experty.IncomingCallService");
                     intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_MULTIPLE_TASK);
                     intent.putExtra("call", bundle);
+                    IncomingCallService.putExtra("call", bundle);
                     try {
                         // TODO: 2. send notification to js handlers (see example below)
                         if (isForeground) {
                             jsDelivery.notifyNotification(bundle);
                         } else {
                         //  context.startActivity(intent);
+                            if (isCallNotification(bundle))
+                                context.startService(IncomingCallService);
                             context.startService(intent);
                             HeadlessJsTaskService.acquireWakeLockNow(context);
                         }
@@ -171,7 +196,7 @@ public class RNPushNotificationListenerService extends FirebaseMessagingService 
                         Log.e(LOG_TAG, e.getMessage());
                     }
                     return;
-                }
+                }        
 
         bundle.putBoolean("foreground", isForeground);
         bundle.putBoolean("userInteraction", false);
