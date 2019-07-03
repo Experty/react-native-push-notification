@@ -271,7 +271,7 @@ class SendSeEvent implements Runnable {
         try {
             AsyncStorage as = new AsyncStorage((ReactApplicationContext) context);
             Bundle asBundle = as.getBundle();
-            if (asBundle == null) throw new Exception("Can't get AsyncStorage");
+            if (asBundle.getString("host") == null) throw new Exception("Can't get AsyncStorage");
             String host = asBundle.getString("host") + "/api/es?data=";
             String dataParam = getDataParam(b, asBundle.getString("id"));
             String url = host + dataParam;
@@ -302,7 +302,6 @@ class SendSeEvent implements Runnable {
         JSONObject mainDataObj = new JSONObject();
         mainDataObj.put("mobile", "android");
         mainDataObj.put("platform", "android");
-        mainDataObj.put("id", id);
         mainDataObj.put("timestamp", new Date().getTime());
         if (b.containsKey("default")) {
             JSONObject json = new JSONObject();
@@ -320,6 +319,9 @@ class SendSeEvent implements Runnable {
                         }
                     } else {
                         mainDataObj.put("callType", "contact-call");
+                    }
+                    if (id != null) {
+                        mainDataObj.put("id", id);
                     }
 
                     if (data.has("callItemId")) {
