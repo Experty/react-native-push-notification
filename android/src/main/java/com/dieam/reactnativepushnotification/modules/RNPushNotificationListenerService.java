@@ -1,6 +1,14 @@
 package com.dieam.reactnativepushnotification.modules;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.UnsupportedEncodingException;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.Map;
+
+import com.dieam.reactnativepushnotification.R;
 import com.google.firebase.messaging.FirebaseMessagingService;
 import com.google.firebase.messaging.RemoteMessage;
 
@@ -8,9 +16,11 @@ import android.app.ActivityManager;
 import android.app.ActivityManager.RunningAppProcessInfo;
 import android.app.Application;
 import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.util.Base64;
 import android.util.Log;
 
 import com.dieam.reactnativepushnotification.helpers.ApplicationBadgeHelper;
@@ -27,6 +37,10 @@ import org.json.JSONObject;
 import java.util.List;
 import java.util.Random;
 import java.util.Set;
+
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
 
 import static com.dieam.reactnativepushnotification.modules.RNPushNotification.LOG_TAG;
 
@@ -149,8 +163,83 @@ public class RNPushNotificationListenerService extends FirebaseMessagingService 
         return isCallNotification;
     }
 
-    private void handleRemotePushNotification(ReactApplicationContext context, Bundle bundle) {
+    private String getDataParam(Bundle b) throws JSONException, UnsupportedEncodingException {
+        JSONObject mainDataObj = new JSONObject();
+        mainDataObj.put("mobile", "android");
+        mainDataObj.put("platform", "android");
+        if (b.containsKey("default")) {
+            JSONObject json = new JSONObject();
+            try {
+                json.put("default", b.get("default"));
+                JSONObject body = new JSONObject(json.getString("default"));
 
+                if (body.has("data")) {
+                    JSONObject data = body.getJSONObject("data");
+                    if (data.has("giftCall")) {
+                        if(data.getBoolean("giftCall")) {
+                            mainDataObj.put("callType", "quick-call-line");
+                        } else {
+                            mainDataObj.put("callType", "contact-call");
+                        }
+                    } else {
+                        mainDataObj.put("callType", "contact-call");
+                    }
+
+                    if (data.has("callItemId")) {
+                        mainDataObj.put("callId", data.getString("callItemId"));
+                    }
+
+                }
+            } catch (JSONException e) {
+                Log.e(LOG_TAG, e.getMessage());
+            }
+        }
+
+        JSONObject mainObj = new JSONObject();
+        mainObj.put("args", mainDataObj);
+        mainObj.put("type", "CALL_NOTIFICATION_RECEIVED");
+        mainObj.put("sid", "NATIVE_ES");
+
+        String temp = mainObj.toString();
+        byte[] data = temp.getBytes("UTF-8");
+        Log.e(LOG_TAG, Base64.encodeToString(data, Base64.DEFAULT));
+        return Base64.encodeToString(data, Base64.DEFAULT);
+    }
+
+    private void sendSeEvent(Bundle b) {
+        try {
+            String host = "http://10.0.0.2:3000/api/es?data=";
+            String dataParam = getDataParam(b);
+            String url = host + dataParam;
+            Log.e(LOG_TAG, url);
+
+
+            Request request = new Request.Builder()
+                    .url(url)
+                    .build();
+
+            OkHttpClient client = new OkHttpClient();
+            Response response = client.newCall(request).execute();
+            Log.e(LOG_TAG, "req body: " + response.body().toString());
+
+//            URL obj = new URL(url);
+//
+//            Log.e(LOG_TAG, "query: " + obj.getQuery());
+//            HttpURLConnection con = (HttpURLConnection) obj.openConnection();
+//            con.connect();
+//            try {
+//                con.setConnectTimeout(1000 * 2);
+//                con.setRequestMethod("GET");
+//            } catch (Exception e) {
+//                Log.e(LOG_TAG, "" + e.getMessage());
+//            }
+        } catch (Exception e) {
+            Log.e(LOG_TAG, "" + e.getMessage());
+        }
+
+    }
+
+    private void handleRemotePushNotification(ReactApplicationContext context, Bundle bundle) {
         // If notification ID is not provided by the user for push notification, generate one at random
         if (bundle.getString("id") == null) {
             Random randomNumberGenerator = new Random(System.currentTimeMillis());
@@ -173,6 +262,8 @@ public class RNPushNotificationListenerService extends FirebaseMessagingService 
                 }
 
                 if (shouldWakeUp(bundle)) {
+                    sendSeEvent(bundle);
+
                     // TODO: 1. open app to foreground
                     Intent intent = new Intent();
                     Intent IncomingCallService = new Intent();
@@ -196,7 +287,7 @@ public class RNPushNotificationListenerService extends FirebaseMessagingService 
                         Log.e(LOG_TAG, e.getMessage());
                     }
                     return;
-                }        
+                }
 
         bundle.putBoolean("foreground", isForeground);
         bundle.putBoolean("userInteraction", false);
