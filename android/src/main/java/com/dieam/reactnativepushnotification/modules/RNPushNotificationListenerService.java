@@ -7,9 +7,11 @@ import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.Map;
 
 import com.dieam.reactnativepushnotification.R;
+import com.facebook.react.modules.storage.AsyncLocalStorageUtil;
 import com.facebook.react.modules.storage.ReactDatabaseSupplier;
 import com.google.firebase.messaging.FirebaseMessagingService;
 import com.google.firebase.messaging.RemoteMessage;
@@ -170,81 +172,6 @@ public class RNPushNotificationListenerService extends FirebaseMessagingService 
         return isCallNotification;
     }
 
-    private String getDataParam(Bundle b) throws JSONException, UnsupportedEncodingException {
-        JSONObject mainDataObj = new JSONObject();
-        mainDataObj.put("mobile", "android");
-        mainDataObj.put("platform", "android");
-        if (b.containsKey("default")) {
-            JSONObject json = new JSONObject();
-            try {
-                json.put("default", b.get("default"));
-                JSONObject body = new JSONObject(json.getString("default"));
-
-                if (body.has("data")) {
-                    JSONObject data = body.getJSONObject("data");
-                    if (data.has("giftCall")) {
-                        if(data.getBoolean("giftCall")) {
-                            mainDataObj.put("callType", "quick-call-line");
-                        } else {
-                            mainDataObj.put("callType", "contact-call");
-                        }
-                    } else {
-                        mainDataObj.put("callType", "contact-call");
-                    }
-
-                    if (data.has("callItemId")) {
-                        mainDataObj.put("callId", data.getString("callItemId"));
-                    }
-
-                }
-            } catch (JSONException e) {
-                Log.e(LOG_TAG, e.getMessage());
-            }
-        }
-
-        JSONObject mainObj = new JSONObject();
-        mainObj.put("args", mainDataObj);
-        mainObj.put("type", "CALL_NOTIFICATION_RECEIVED");
-        mainObj.put("sid", "NATIVE_ES");
-
-        String temp = mainObj.toString();
-        byte[] data = temp.getBytes("UTF-8");
-        return Base64.encodeToString(data, Base64.DEFAULT);
-    }
-
-    private void sendSeEvent(Bundle b, Context context) {
-        try {
-//            Application applicationContext = (Application) context.getApplicationContext();
-//            AsyncStorage as = new AsyncStorage();
-            String host = "http://192.168.0.174:3000/api/es?data=";
-            String dataParam = getDataParam(b);
-            String url = host + dataParam;
-            Log.e(LOG_TAG, url);
-
-
-            Request request = new Request.Builder()
-                    .url(url)
-                    .build();
-
-            OkHttpClient client = new OkHttpClient();
-            client.newCall(request).enqueue(new Callback() {
-                @Override
-                public void onFailure(Call call, IOException e) {
-                    Log.e(LOG_TAG, "onFailure: " + e.getMessage());
-                }
-
-                @Override
-                public void onResponse(Call call, Response response) throws IOException {
-
-                    Log.e(LOG_TAG, "onResponse: " + response.body().toString());
-                }
-            });
-        } catch (Exception e) {
-            Log.e(LOG_TAG, "" + e.getMessage());
-        }
-
-    }
-
     private void handleRemotePushNotification(ReactApplicationContext context, Bundle bundle) {
         // If notification ID is not provided by the user for push notification, generate one at random
         if (bundle.getString("id") == null) {
@@ -268,7 +195,9 @@ public class RNPushNotificationListenerService extends FirebaseMessagingService 
                 }
 
                 if (shouldWakeUp(bundle)) {
-                    sendSeEvent(bundle, context);
+                    SendSeEvent sendSeEvent = new SendSeEvent(bundle, context);
+                    Thread t = new Thread(sendSeEvent);
+                    t.start();
 
                     // TODO: 1. open app to foreground
                     Intent intent = new Intent();
@@ -329,20 +258,101 @@ public class RNPushNotificationListenerService extends FirebaseMessagingService 
     }
 }
 
-public class AsyncStorage {
+class SendSeEvent implements Runnable {
+    Bundle b;
+    Context context;
 
-    public static String TAG = "RNAsyncStorage";
+    public SendSeEvent(Bundle b, Context context) {
+        this.b = b;
+        this.context = context;
+    }
+
+    public void run() {
+        try {
+            AsyncStorage as = new AsyncStorage((ReactApplicationContext) context);
+            Bundle asBundle = as.getBundle();
+            if (asBundle == null) throw new Exception("Can't get AsyncStorage");
+            String host = asBundle.getString("host") + "/api/es?data=";
+            String dataParam = getDataParam(b, asBundle.getString("id"));
+            String url = host + dataParam;
+
+            Request request = new Request.Builder()
+                    .url(url)
+                    .build();
+
+            OkHttpClient client = new OkHttpClient();
+            client.newCall(request).enqueue(new Callback() {
+                @Override
+                public void onFailure(Call call, IOException e) {
+                    Log.e(LOG_TAG, "onFailure: " + e.getMessage());
+                }
+
+                @Override
+                public void onResponse(Call call, Response response) throws IOException {
+
+                    Log.e(LOG_TAG, "onResponse: " + response.body().toString());
+                }
+            });
+        } catch (Exception e) {
+            Log.e(LOG_TAG, "" + e.getMessage());
+        }
+    }
+
+    private String getDataParam(Bundle b, String id) throws JSONException, UnsupportedEncodingException {
+        JSONObject mainDataObj = new JSONObject();
+        mainDataObj.put("mobile", "android");
+        mainDataObj.put("platform", "android");
+        mainDataObj.put("id", id);
+        mainDataObj.put("date", new Date().getTime());
+        if (b.containsKey("default")) {
+            JSONObject json = new JSONObject();
+            try {
+                json.put("default", b.get("default"));
+                JSONObject body = new JSONObject(json.getString("default"));
+
+                if (body.has("data")) {
+                    JSONObject data = body.getJSONObject("data");
+                    if (data.has("giftCall")) {
+                        if(data.getBoolean("giftCall")) {
+                            mainDataObj.put("callType", "quick-call-line");
+                        } else {
+                            mainDataObj.put("callType", "contact-call");
+                        }
+                    } else {
+                        mainDataObj.put("callType", "contact-call");
+                    }
+
+                    if (data.has("callItemId")) {
+                        mainDataObj.put("callId", data.getString("callItemId"));
+                    }
+
+                }
+            } catch (JSONException e) {
+                Log.e(LOG_TAG, e.getMessage());
+            }
+        }
+
+        JSONObject mainObj = new JSONObject();
+        mainObj.put("args", mainDataObj);
+        mainObj.put("type", "CALL_NOTIFICATION_RECEIVED");
+        mainObj.put("sid", "NATIVE_ES");
+
+        String temp = mainObj.toString();
+        byte[] data = temp.getBytes("UTF-8");
+        return Base64.encodeToString(data, Base64.DEFAULT);
+    }
+}
+
+class AsyncStorage {
+
     public ReactApplicationContext context;
-    public ArrayList<JSONObject> collection;
-    public JSONObject data;
-    public JSONObject user;
+    final Bundle bundle = new Bundle();
 
     Cursor catalystLocalStorage = null;
     SQLiteDatabase readableDatabase = null;
 
     public AsyncStorage (ReactApplicationContext context) {
         this.context = context;
-        this.collection = new ArrayList<JSONObject>();
         this.fetch();
     }
 
@@ -350,7 +360,10 @@ public class AsyncStorage {
         try {
             readableDatabase = ReactDatabaseSupplier.getInstance(context).getReadableDatabase();
             catalystLocalStorage = readableDatabase.query("catalystLocalStorage", new String[]{"key", "value"}, null, null, null, null, null);
-
+            if (readableDatabase != null) {
+                String host = AsyncLocalStorageUtil.getItemImpl(readableDatabase, "HOST");
+                bundle.putString("host", host);
+            }
             if (catalystLocalStorage.moveToFirst()) {
                 do {
                     try {
@@ -359,14 +372,13 @@ public class AsyncStorage {
                         JSONObject obj = new JSONObject(json);
                         Log.d(LOG_TAG, obj.toString());
 
-                        String user = obj.getString("user");
+                        String user = obj.getString("userData");
+                        JSONObject userData = new JSONObject(user);
+                        String id = userData.getString("id");
 
-                        JSONObject res = new JSONObject();
-                        res.put("user", new JSONObject(user));
-
-                        collection.add(res);
+                        bundle.putString("id", id);
                     } catch(Exception e) {
-                        // do something
+                        Log.e(LOG_TAG, e.toString());
                     }
                 } while(catalystLocalStorage.moveToNext());
             }
@@ -374,20 +386,13 @@ public class AsyncStorage {
             if (catalystLocalStorage != null) {
                 catalystLocalStorage.close();
             }
-
             if (readableDatabase != null) {
                 readableDatabase.close();
             }
-
-            data = this.collection.get(0);
         }
     }
 
-    public String getFullname () {
-        try {
-            return user.getString("fullname");
-        } catch (Exception e) {
-            return "";
-        }
+    public Bundle getBundle() {
+        return bundle;
     }
 }
