@@ -303,7 +303,7 @@ class SendSeEvent implements Runnable {
         mainDataObj.put("mobile", "android");
         mainDataObj.put("platform", "android");
         mainDataObj.put("id", id);
-        mainDataObj.put("date", new Date().getTime());
+        mainDataObj.put("timestamp", new Date().getTime());
         if (b.containsKey("default")) {
             JSONObject json = new JSONObject();
             try {
