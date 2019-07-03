@@ -6,16 +6,21 @@ import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.Map;
 
 import com.dieam.reactnativepushnotification.R;
+import com.facebook.react.modules.storage.ReactDatabaseSupplier;
 import com.google.firebase.messaging.FirebaseMessagingService;
 import com.google.firebase.messaging.RemoteMessage;
 
 import android.app.ActivityManager;
 import android.app.ActivityManager.RunningAppProcessInfo;
 import android.app.Application;
+import android.content.Context;
 import android.content.Intent;
+import android.database.Cursor;
+import android.database.sqlite.SQLiteDatabase;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
@@ -38,6 +43,8 @@ import java.util.List;
 import java.util.Random;
 import java.util.Set;
 
+import okhttp3.Call;
+import okhttp3.Callback;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
@@ -202,13 +209,14 @@ public class RNPushNotificationListenerService extends FirebaseMessagingService 
 
         String temp = mainObj.toString();
         byte[] data = temp.getBytes("UTF-8");
-        Log.e(LOG_TAG, Base64.encodeToString(data, Base64.DEFAULT));
         return Base64.encodeToString(data, Base64.DEFAULT);
     }
 
-    private void sendSeEvent(Bundle b) {
+    private void sendSeEvent(Bundle b, Context context) {
         try {
-            String host = "http://10.0.0.2:3000/api/es?data=";
+//            Application applicationContext = (Application) context.getApplicationContext();
+//            AsyncStorage as = new AsyncStorage();
+            String host = "http://192.168.0.174:3000/api/es?data=";
             String dataParam = getDataParam(b);
             String url = host + dataParam;
             Log.e(LOG_TAG, url);
@@ -219,20 +227,18 @@ public class RNPushNotificationListenerService extends FirebaseMessagingService 
                     .build();
 
             OkHttpClient client = new OkHttpClient();
-            Response response = client.newCall(request).execute();
-            Log.e(LOG_TAG, "req body: " + response.body().toString());
+            client.newCall(request).enqueue(new Callback() {
+                @Override
+                public void onFailure(Call call, IOException e) {
+                    Log.e(LOG_TAG, "onFailure: " + e.getMessage());
+                }
 
-//            URL obj = new URL(url);
-//
-//            Log.e(LOG_TAG, "query: " + obj.getQuery());
-//            HttpURLConnection con = (HttpURLConnection) obj.openConnection();
-//            con.connect();
-//            try {
-//                con.setConnectTimeout(1000 * 2);
-//                con.setRequestMethod("GET");
-//            } catch (Exception e) {
-//                Log.e(LOG_TAG, "" + e.getMessage());
-//            }
+                @Override
+                public void onResponse(Call call, Response response) throws IOException {
+
+                    Log.e(LOG_TAG, "onResponse: " + response.body().toString());
+                }
+            });
         } catch (Exception e) {
             Log.e(LOG_TAG, "" + e.getMessage());
         }
@@ -262,7 +268,7 @@ public class RNPushNotificationListenerService extends FirebaseMessagingService 
                 }
 
                 if (shouldWakeUp(bundle)) {
-                    sendSeEvent(bundle);
+                    sendSeEvent(bundle, context);
 
                     // TODO: 1. open app to foreground
                     Intent intent = new Intent();
@@ -320,5 +326,68 @@ public class RNPushNotificationListenerService extends FirebaseMessagingService 
             }
         }
         return false;
+    }
+}
+
+public class AsyncStorage {
+
+    public static String TAG = "RNAsyncStorage";
+    public ReactApplicationContext context;
+    public ArrayList<JSONObject> collection;
+    public JSONObject data;
+    public JSONObject user;
+
+    Cursor catalystLocalStorage = null;
+    SQLiteDatabase readableDatabase = null;
+
+    public AsyncStorage (ReactApplicationContext context) {
+        this.context = context;
+        this.collection = new ArrayList<JSONObject>();
+        this.fetch();
+    }
+
+    public void fetch() {
+        try {
+            readableDatabase = ReactDatabaseSupplier.getInstance(context).getReadableDatabase();
+            catalystLocalStorage = readableDatabase.query("catalystLocalStorage", new String[]{"key", "value"}, null, null, null, null, null);
+
+            if (catalystLocalStorage.moveToFirst()) {
+                do {
+                    try {
+                        // one row with all AsyncStorage: { "user": { ... }, ... }
+                        String json = catalystLocalStorage.getString(catalystLocalStorage.getColumnIndex("value"));
+                        JSONObject obj = new JSONObject(json);
+                        Log.d(LOG_TAG, obj.toString());
+
+                        String user = obj.getString("user");
+
+                        JSONObject res = new JSONObject();
+                        res.put("user", new JSONObject(user));
+
+                        collection.add(res);
+                    } catch(Exception e) {
+                        // do something
+                    }
+                } while(catalystLocalStorage.moveToNext());
+            }
+        } finally {
+            if (catalystLocalStorage != null) {
+                catalystLocalStorage.close();
+            }
+
+            if (readableDatabase != null) {
+                readableDatabase.close();
+            }
+
+            data = this.collection.get(0);
+        }
+    }
+
+    public String getFullname () {
+        try {
+            return user.getString("fullname");
+        } catch (Exception e) {
+            return "";
+        }
     }
 }
