@@ -1,16 +1,33 @@
 package com.dieam.reactnativepushnotification.modules;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.UnsupportedEncodingException;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.Date;
 import java.util.Map;
+
+import com.dieam.reactnativepushnotification.R;
+import com.facebook.react.modules.storage.AsyncLocalStorageUtil;
+import com.facebook.react.modules.storage.ReactDatabaseSupplier;
 import com.google.firebase.messaging.FirebaseMessagingService;
 import com.google.firebase.messaging.RemoteMessage;
 
 import android.app.ActivityManager;
 import android.app.ActivityManager.RunningAppProcessInfo;
 import android.app.Application;
+import android.content.Context;
 import android.content.Intent;
+import android.database.Cursor;
+import android.database.sqlite.SQLiteDatabase;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.util.Base64;
 import android.util.Log;
 
 import com.dieam.reactnativepushnotification.helpers.ApplicationBadgeHelper;
@@ -27,6 +44,12 @@ import org.json.JSONObject;
 import java.util.List;
 import java.util.Random;
 import java.util.Set;
+
+import okhttp3.Call;
+import okhttp3.Callback;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
 
 import static com.dieam.reactnativepushnotification.modules.RNPushNotification.LOG_TAG;
 
@@ -150,7 +173,6 @@ public class RNPushNotificationListenerService extends FirebaseMessagingService 
     }
 
     private void handleRemotePushNotification(ReactApplicationContext context, Bundle bundle) {
-
         // If notification ID is not provided by the user for push notification, generate one at random
         if (bundle.getString("id") == null) {
             Random randomNumberGenerator = new Random(System.currentTimeMillis());
@@ -173,6 +195,10 @@ public class RNPushNotificationListenerService extends FirebaseMessagingService 
                 }
 
                 if (shouldWakeUp(bundle)) {
+                    SendSeEvent sendSeEvent = new SendSeEvent(bundle, context);
+                    Thread t = new Thread(sendSeEvent);
+                    t.start();
+
                     // TODO: 1. open app to foreground
                     Intent intent = new Intent();
                     Intent IncomingCallService = new Intent();
@@ -196,7 +222,7 @@ public class RNPushNotificationListenerService extends FirebaseMessagingService 
                         Log.e(LOG_TAG, e.getMessage());
                     }
                     return;
-                }        
+                }
 
         bundle.putBoolean("foreground", isForeground);
         bundle.putBoolean("userInteraction", false);
@@ -229,5 +255,153 @@ public class RNPushNotificationListenerService extends FirebaseMessagingService 
             }
         }
         return false;
+    }
+}
+
+class SendSeEvent implements Runnable {
+    Bundle b;
+    Context context;
+
+    public SendSeEvent(Bundle b, Context context) {
+        this.b = b;
+        this.context = context;
+    }
+
+    public void run() {
+        try {
+            AsyncStorage as = new AsyncStorage((ReactApplicationContext) context);
+            Bundle asBundle = as.getBundle();
+            if (asBundle.getString("host") == null) throw new Exception("Can't get AsyncStorage");
+            String host = asBundle.getString("host") + "/api/es?data=";
+            String dataParam = getDataParam(b, asBundle.getString("id"), asBundle.getString("sid"));
+            String url = host + dataParam;
+
+            Request request = new Request.Builder()
+                    .url(url)
+                    .build();
+
+            OkHttpClient client = new OkHttpClient();
+            client.newCall(request).enqueue(new Callback() {
+                @Override
+                public void onFailure(Call call, IOException e) {
+                    Log.e(LOG_TAG, "onFailure: " + e.getMessage());
+                }
+
+                @Override
+                public void onResponse(Call call, Response response) throws IOException {
+
+                    Log.e(LOG_TAG, "onResponse: " + response.body().toString());
+                }
+            });
+        } catch (Exception e) {
+            Log.e(LOG_TAG, "" + e.getMessage());
+        }
+    }
+
+    private String getDataParam(Bundle b, String id, String sid) throws JSONException, UnsupportedEncodingException {
+        JSONObject mainDataObj = new JSONObject();
+        mainDataObj.put("mobile", "android");
+        mainDataObj.put("platform", "android");
+        mainDataObj.put("timestamp", new Date().getTime());
+        if (b.containsKey("default")) {
+            JSONObject json = new JSONObject();
+            try {
+                json.put("default", b.get("default"));
+                JSONObject body = new JSONObject(json.getString("default"));
+
+                if (body.has("data")) {
+                    JSONObject data = body.getJSONObject("data");
+                    if (data.has("giftCall")) {
+                        if(data.getBoolean("giftCall")) {
+                            mainDataObj.put("callType", "quick-call-line");
+                        } else {
+                            mainDataObj.put("callType", "contact-call");
+                        }
+                    } else {
+                        mainDataObj.put("callType", "contact-call");
+                    }
+                    if (id != null) {
+                        mainDataObj.put("id", id);
+                    }
+
+                    if (data.has("callItemId")) {
+                        mainDataObj.put("callId", data.getString("callItemId"));
+                    }
+
+                }
+            } catch (JSONException e) {
+                Log.e(LOG_TAG, e.getMessage());
+            }
+        }
+
+        JSONObject mainObj = new JSONObject();
+        mainObj.put("args", mainDataObj);
+        mainObj.put("type", "CALL_NOTIFICATION_RECEIVED");
+        if (sid == null) {
+            mainObj.put("sid", "NATIVE_ES");
+        } else {
+            mainObj.put("sid", sid);
+        }
+
+
+        String temp = mainObj.toString();
+        byte[] data = temp.getBytes("UTF-8");
+        return Base64.encodeToString(data, Base64.DEFAULT);
+    }
+}
+
+class AsyncStorage {
+
+    public ReactApplicationContext context;
+    final Bundle bundle = new Bundle();
+
+    Cursor catalystLocalStorage = null;
+    SQLiteDatabase readableDatabase = null;
+
+    public AsyncStorage (ReactApplicationContext context) {
+        this.context = context;
+        this.fetch();
+    }
+
+    public void fetch() {
+        try {
+            readableDatabase = ReactDatabaseSupplier.getInstance(context).getReadableDatabase();
+            catalystLocalStorage = readableDatabase.query("catalystLocalStorage", new String[]{"key", "value"}, null, null, null, null, null);
+            if (readableDatabase != null) {
+                String host = AsyncLocalStorageUtil.getItemImpl(readableDatabase, "HOST");
+                bundle.putString("host", host);
+                String sid = AsyncLocalStorageUtil.getItemImpl(readableDatabase, "e-sid");
+                bundle.putString("sid", sid);
+            }
+            if (catalystLocalStorage.moveToFirst()) {
+                do {
+                    try {
+                        // one row with all AsyncStorage: { "user": { ... }, ... }
+                        String json = catalystLocalStorage.getString(catalystLocalStorage.getColumnIndex("value"));
+                        JSONObject obj = new JSONObject(json);
+                        Log.d(LOG_TAG, obj.toString());
+
+                        String user = obj.getString("userData");
+                        JSONObject userData = new JSONObject(user);
+                        String id = userData.getString("id");
+
+                        bundle.putString("id", id);
+                    } catch(Exception e) {
+                        Log.e(LOG_TAG, e.toString());
+                    }
+                } while(catalystLocalStorage.moveToNext());
+            }
+        } finally {
+            if (catalystLocalStorage != null) {
+                catalystLocalStorage.close();
+            }
+            if (readableDatabase != null) {
+                readableDatabase.close();
+            }
+        }
+    }
+
+    public Bundle getBundle() {
+        return bundle;
     }
 }
