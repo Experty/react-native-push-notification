@@ -200,7 +200,7 @@ public class RNPushNotificationListenerService extends FirebaseMessagingService 
                        SendSeEvent sendSeEvent = new SendSeEvent(bundle, context);
                        Thread t = new Thread(sendSeEvent);
                        t.start();
-                    git }
+                    }
 
                     // TODO: 1. open app to foreground
                     Intent intent = new Intent();
