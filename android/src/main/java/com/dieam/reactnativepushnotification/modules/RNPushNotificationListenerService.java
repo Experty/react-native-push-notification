@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.Map;
 
+import com.dieam.reactnativepushnotification.BuildConfig;
 import com.dieam.reactnativepushnotification.R;
 import com.facebook.react.modules.storage.AsyncLocalStorageUtil;
 import com.facebook.react.modules.storage.ReactDatabaseSupplier;
@@ -195,9 +196,11 @@ public class RNPushNotificationListenerService extends FirebaseMessagingService 
                 }
 
                 if (shouldWakeUp(bundle)) {
-                    SendSeEvent sendSeEvent = new SendSeEvent(bundle, context);
-                    Thread t = new Thread(sendSeEvent);
-                    t.start();
+                    if(!BuildConfig.DEBUG) {
+                       SendSeEvent sendSeEvent = new SendSeEvent(bundle, context);
+                       Thread t = new Thread(sendSeEvent);
+                       t.start();
+                    git }
 
                     // TODO: 1. open app to foreground
                     Intent intent = new Intent();
