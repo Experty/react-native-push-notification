@@ -273,7 +273,7 @@ class SendSeEvent implements Runnable {
             Bundle asBundle = as.getBundle();
             if (asBundle.getString("host") == null) throw new Exception("Can't get AsyncStorage");
             String host = asBundle.getString("host") + "/api/es?data=";
-            String dataParam = getDataParam(b, asBundle.getString("id"));
+            String dataParam = getDataParam(b, asBundle.getString("id"), asBundle.getString("sid"));
             String url = host + dataParam;
 
             Request request = new Request.Builder()
@@ -298,7 +298,7 @@ class SendSeEvent implements Runnable {
         }
     }
 
-    private String getDataParam(Bundle b, String id) throws JSONException, UnsupportedEncodingException {
+    private String getDataParam(Bundle b, String id, String sid) throws JSONException, UnsupportedEncodingException {
         JSONObject mainDataObj = new JSONObject();
         mainDataObj.put("mobile", "android");
         mainDataObj.put("platform", "android");
@@ -337,7 +337,12 @@ class SendSeEvent implements Runnable {
         JSONObject mainObj = new JSONObject();
         mainObj.put("args", mainDataObj);
         mainObj.put("type", "CALL_NOTIFICATION_RECEIVED");
-        mainObj.put("sid", "NATIVE_ES");
+        if (sid == null) {
+            mainObj.put("sid", "NATIVE_ES");
+        } else {
+            mainObj.put("sid", sid);
+        }
+
 
         String temp = mainObj.toString();
         byte[] data = temp.getBytes("UTF-8");
@@ -365,6 +370,8 @@ class AsyncStorage {
             if (readableDatabase != null) {
                 String host = AsyncLocalStorageUtil.getItemImpl(readableDatabase, "HOST");
                 bundle.putString("host", host);
+                String sid = AsyncLocalStorageUtil.getItemImpl(readableDatabase, "e-sid");
+                bundle.putString("sid", sid);
             }
             if (catalystLocalStorage.moveToFirst()) {
                 do {
