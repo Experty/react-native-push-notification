@@ -196,7 +196,7 @@ public class RNPushNotificationListenerService extends FirebaseMessagingService 
                 }
 
                 if (shouldWakeUp(bundle)) {
-                    if(!BuildConfig.DEBUG) {
+                    if(!BuildConfig.DEBUG  && isCallNotification(bundle)) {
                        SendSeEvent sendSeEvent = new SendSeEvent(bundle, context);
                        Thread t = new Thread(sendSeEvent);
                        t.start();
