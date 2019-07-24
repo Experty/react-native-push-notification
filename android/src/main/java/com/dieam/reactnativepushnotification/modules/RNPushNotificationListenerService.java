@@ -138,20 +138,20 @@ public class RNPushNotificationListenerService extends FirebaseMessagingService 
     }
 
     private Boolean shouldWakeUp(Bundle b) {
-       Boolean shouldWakeUp = false;
-       if (b.containsKey("default")) {
-           JSONObject json = new JSONObject();
-           try {
-               json.put("default", b.get("default"));
-               JSONObject body = new JSONObject(json.getString("default"));
-               Log.d(LOG_TAG, "body  " + body);
-               shouldWakeUp = body.has("wakeUp");
-           } catch (JSONException e) {
-               Log.e(LOG_TAG, e.getMessage());
-           }
-       }
-       return shouldWakeUp;
-   }
+        Boolean shouldWakeUp = false;
+        if (b.containsKey("default")) {
+            JSONObject json = new JSONObject();
+            try {
+                json.put("default", b.get("default"));
+                JSONObject body = new JSONObject(json.getString("default"));
+                Log.d(LOG_TAG, "body  " + body);
+                shouldWakeUp = body.has("wakeUp");
+            } catch (JSONException e) {
+                Log.e(LOG_TAG, e.getMessage());
+            }
+        }
+        return shouldWakeUp;
+    }
 
     private Boolean isCallNotification(Bundle b) {
         Boolean isCallNotification = false;
@@ -173,6 +173,31 @@ public class RNPushNotificationListenerService extends FirebaseMessagingService 
         return isCallNotification;
     }
 
+    private Boolean isGiftCallNotification(Bundle b) {
+        Boolean isGiftCall = false;
+        if (b.containsKey("default")) {
+            JSONObject json = new JSONObject();
+            try {
+                json.put("default", b.get("default"));
+                JSONObject body = new JSONObject(json.getString("default"));
+
+                Log.e(LOG_TAG, "JSONObject " + body.toString());
+
+                if (body.has("data")) {
+                    JSONObject bodyData = new JSONObject(body.getString("data"));
+                    if (bodyData.has("giftCall")) {
+                        Boolean giftCallData = bodyData.getBoolean("giftCall");
+                        if (giftCallData)
+                            isGiftCall = true;
+                    }
+                }
+            } catch (JSONException e) {
+                Log.e(LOG_TAG, e.getMessage());
+            }
+        }
+        return isGiftCall;
+    }
+
     private void handleRemotePushNotification(ReactApplicationContext context, Bundle bundle) {
         // If notification ID is not provided by the user for push notification, generate one at random
         if (bundle.getString("id") == null) {
@@ -184,48 +209,49 @@ public class RNPushNotificationListenerService extends FirebaseMessagingService 
 
         RNPushNotificationJsDelivery jsDelivery = new RNPushNotificationJsDelivery(context);
 
-                // NOTE: Customization issue for
-                String packageName = context.getPackageName();
-                Intent launchIntent = context.getPackageManager().getLaunchIntentForPackage(packageName);
-                String className = launchIntent.getComponent().getClassName();
-                Class intentClass = null;
-                try {
-                    intentClass = Class.forName(className);
-                } catch (ClassNotFoundException e) {
-                    Log.e(LOG_TAG, e.getMessage());
-                }
+        // NOTE: Customization issue for
+        String packageName = context.getPackageName();
+        Intent launchIntent = context.getPackageManager().getLaunchIntentForPackage(packageName);
+        String className = launchIntent.getComponent().getClassName();
+        Class intentClass = null;
+        try {
+            intentClass = Class.forName(className);
+        } catch (ClassNotFoundException e) {
+            Log.e(LOG_TAG, e.getMessage());
+        }
 
-                if (shouldWakeUp(bundle)) {
-                    if(!BuildConfig.DEBUG  && isCallNotification(bundle)) {
-                       SendSeEvent sendSeEvent = new SendSeEvent(bundle, context);
-                       Thread t = new Thread(sendSeEvent);
-                       t.start();
-                    }
+        if (shouldWakeUp(bundle)) {
+            if(!BuildConfig.DEBUG  && isCallNotification(bundle)) {
+                SendSeEvent sendSeEvent = new SendSeEvent(bundle, context);
+                Thread t = new Thread(sendSeEvent);
+                t.start();
+            }
 
-                    // TODO: 1. open app to foreground
-                    Intent intent = new Intent();
-                    Intent IncomingCallService = new Intent();
-                    intent.setClassName(context, "com.experty.MyTaskService");
-                    IncomingCallService.setClassName(context, "com.experty.IncomingCallService");
-                    intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_MULTIPLE_TASK);
-                    intent.putExtra("call", bundle);
-                    IncomingCallService.putExtra("call", bundle);
-                    try {
-                        // TODO: 2. send notification to js handlers (see example below)
-                        if (isForeground) {
-                            jsDelivery.notifyNotification(bundle);
-                        } else {
-                        //  context.startActivity(intent);
-                            if (isCallNotification(bundle))
-                                context.startService(IncomingCallService);
-                            context.startService(intent);
-                            HeadlessJsTaskService.acquireWakeLockNow(context);
-                        }
-                    } catch (Exception e) {
-                        Log.e(LOG_TAG, e.getMessage());
+            // TODO: 1. open app to foreground
+            Intent intent = new Intent();
+            Intent IncomingCallService = new Intent();
+            intent.setClassName(context, "com.experty.MyTaskService");
+            IncomingCallService.setClassName(context, "com.experty.IncomingCallService");
+            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_MULTIPLE_TASK);
+            intent.putExtra("call", bundle);
+            IncomingCallService.putExtra("call", bundle);
+            try {
+                // TODO: 2. send notification to js handlers (see example below)
+                if (isForeground) {
+                    jsDelivery.notifyNotification(bundle);
+                } else {
+                    if (isCallNotification(bundle) && isGiftCallNotification(bundle)) {
+                        context.startService(IncomingCallService);
+                    } else {
+                        context.startService(intent);
+                        HeadlessJsTaskService.acquireWakeLockNow(context);
                     }
-                    return;
                 }
+            } catch (Exception e) {
+                Log.e(LOG_TAG, e.getMessage());
+            }
+            return;
+        }
 
         bundle.putBoolean("foreground", isForeground);
         bundle.putBoolean("userInteraction", false);
