@@ -242,6 +242,10 @@ public class RNPushNotificationListenerService extends FirebaseMessagingService 
                 } else {
                     if (isCallNotification(bundle) && isGiftCallNotification(bundle)) {
                         context.startService(IncomingCallService);
+                        Boolean appRunning = isAppRunning();
+                        Log.e(LOG_TAG, "appRunning" + appRunning);
+                        if(appRunning)
+                            jsDelivery.notifyNotification(bundle);
                     } else {
                         context.startService(intent);
                         HeadlessJsTaskService.acquireWakeLockNow(context);
@@ -280,6 +284,20 @@ public class RNPushNotificationListenerService extends FirebaseMessagingService 
                             return true;
                         }
                     }
+                }
+            }
+        }
+        return false;
+    }
+
+    private boolean isAppRunning() {
+        final ActivityManager activityManager = (ActivityManager) this.getSystemService(ACTIVITY_SERVICE);
+        final List<ActivityManager.RunningAppProcessInfo> procInfos = activityManager.getRunningAppProcesses();
+        if (procInfos != null)
+        {
+            for (final ActivityManager.RunningAppProcessInfo processInfo : procInfos) {
+                if (processInfo.processName.equals("com.experty")) {
+                    return true;
                 }
             }
         }
