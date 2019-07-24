@@ -241,9 +241,9 @@ public class RNPushNotificationListenerService extends FirebaseMessagingService 
                     jsDelivery.notifyNotification(bundle);
                 } else {
                     if (isCallNotification(bundle) && isGiftCallNotification(bundle)) {
-                        context.startService(IncomingCallService);
                         Boolean appRunning = isAppRunning();
-                        Log.e(LOG_TAG, "appRunning" + appRunning);
+                        IncomingCallService.putExtra("appRunning", appRunning);
+                        context.startService(IncomingCallService);
                         if(appRunning)
                             jsDelivery.notifyNotification(bundle);
                     } else {
