@@ -439,10 +439,10 @@ class AsyncStorage {
                 } while(catalystLocalStorage.moveToNext());
             }
         } finally {
-            if (catalystLocalStorage != null) {
+            if (catalystLocalStorage != null && !catalystLocalStorage.isClosed()) {
                 catalystLocalStorage.close();
             }
-            if (readableDatabase != null) {
+            if (readableDatabase != null && readableDatabase.isOpen()) {
                 readableDatabase.close();
             }
         }
