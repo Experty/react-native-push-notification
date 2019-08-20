@@ -438,14 +438,8 @@ class AsyncStorage {
                     }
                 } while(catalystLocalStorage.moveToNext());
             }
-        } finally {
-            if (catalystLocalStorage != null && !catalystLocalStorage.isClosed()) {
-                try {
-                    catalystLocalStorage.close();
-                } catch (Exception e) {
-                    Log.e(LOG_TAG, "AsyncStorage" + e.getMessage());
-                }
-            }
+        } catch (Exception e) {
+            Log.e(LOG_TAG, e.getMessage());
         }
     }
 
